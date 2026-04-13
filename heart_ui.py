@@ -349,60 +349,7 @@ except:
 
 
 
-
-# @st.cache_data
-# def load_dataset():
-#     return pd.read_csv("heart.csv")
-
-# try:
-#     df = load_dataset()
-
-#     st.write("Dataset Shape:", df.shape)
-
-#     # Style Selector
-#     style_option = st.selectbox(
-#         "Select Plot Style",
-#         ["whitegrid", "darkgrid", "white", "dark", "ticks"]
-#     )
-#     sns.set_style(style_option)
-
-#     # Palette Selector
-#     palette_option = st.selectbox(
-#         "Select Color Theme",
-#         ["deep", "muted", "bright", "pastel", "dark", "colorblind"]
-#     )
-
-#     # Hue Column
-#     hue_column = st.selectbox(
-#         "Select Target Column (Hue)",
-#         df.columns,
-#         index=df.columns.get_loc("HeartDisease") if "HeartDisease" in df.columns else 0
-#     )
-
-#     # Numeric Columns
-#     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-
-#     selected_cols = st.multiselect(
-#         "Select Numeric Columns",
-#         numeric_cols,
-#         default=numeric_cols[:3]
-#     )
-
-#     if len(selected_cols) >= 2:
-#         fig = sns.pairplot(
-#             df[selected_cols + [hue_column]],
-#             hue=hue_column,
-#             palette=palette_option,
-#             height=2.2,
-#             diag_kind="hist"
-#         )
-#         st.pyplot(fig)
-#     else:
-#         st.warning("Select at least two numeric columns.")
-
-# except:
-#     st.info("heart.csv not found in directory.")
-
+ 
 
 
 
