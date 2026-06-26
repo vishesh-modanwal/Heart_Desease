@@ -1,30 +1,43 @@
  
-
-
-
-
-
-import streamlit as st
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+import io
 import joblib
 import sqlite3
+import numpy as np
+import random,time
+import pandas as pd
+import seaborn as sns
+import streamlit as st
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from reportlab.pdfgen import canvas
-import io
+from reportlab.lib.pagesizes import letter
 
  
 
+
+with st.spinner("Analyzing Patient Data..."):
+    time.sleep(2)
 
 # ---------------------------------
 # Page Config
 # ---------------------------------
 st.set_page_config(page_title="Heart Disease Predictor", layout="wide")
 st.title("❤️ Heart Disease Prediction System")
+
+st.markdown("""
+ 
+<h4 style='text-align:center;color:gray'>
+AI Powered Clinical Decision Support
+</h4>
+""",unsafe_allow_html=True)
+
+st.image(
+"https://images.unsplash.com/photo-1579684453423-f84349ef60b0?w=1200",
+use_container_width=True
+)
 st.write("Enter patient details to check heart disease risk")
+
 
 # ---------------------------------
 # Load Model Files (Cached)
@@ -37,7 +50,7 @@ def load_model_files():
         columns = joblib.load("columns.pkl")
         return model, scaler, columns
     except:
-        return None, None, None
+        return  FileNotFoundError
 
 model, scaler, columns = load_model_files()
 
@@ -93,7 +106,7 @@ def save_to_db(age, bp, chol, maxhr, oldpeak, risk, prediction):
     
     
     
-    
+# --------------------------------- 
 # PDF Report
 # ---------------------------------
 def create_pdf(age, bp, chol, maxhr, oldpeak, risk, prediction):
@@ -120,6 +133,7 @@ def create_pdf(age, bp, chol, maxhr, oldpeak, risk, prediction):
 # ---------------------------------
 # Sidebar - Model Info
 # ---------------------------------
+
 st.sidebar.header("Model Information")
 st.sidebar.write("Model: KNN Classifier")
 st.sidebar.write("Accuracy: 87%")
@@ -193,7 +207,10 @@ if st.button("Predict"):
 
 
     st.subheader("Prediction Result")
-
+    
+    
+    
+    
     if prediction == 1:
         st.error(f"⚠️ High Risk of Heart Disease ({risk_percent:.1f}%)")
     else:
@@ -216,6 +233,43 @@ if st.button("Predict"):
 
 
 # ---------------------------------
+# BMI CALCULATOR
+# ---------------------------------
+
+
+
+st.markdown("### BMI Calculator")
+
+height=st.number_input("Height (cm)",100,220,170)
+
+weight=st.number_input("Weight (kg)",20,200,70)
+
+bmi=weight/((height/100)**2)
+
+st.metric("BMI",round(bmi,2))
+
+if bmi<18.5:
+    st.info("Underweight")
+elif bmi<25:
+    st.success("Healthy")
+elif bmi<30:
+    st.warning("Overweight")
+else:
+    st.error("Obese")
+
+tips=[
+"🚶 Walk 30 minutes daily",
+"🥗 Eat more vegetables",
+"🚭 Avoid smoking",
+"❤️ Exercise regularly",
+"😴 Sleep 7-8 hours"
+]
+
+st.info(random.choice(tips))
+
+
+
+# ---------------------------------
 # Patient History
 # ---------------------------------
 st.subheader("📋 Patient History")
@@ -227,7 +281,11 @@ conn.close()
 if not history_df.empty:
     st.dataframe(history_df, use_container_width=True)
 
-  # Delete Single Record
+
+#----------------------
+# Delete Single Record
+#----------------------
+
     st.markdown("### 🗑 Delete Record")
     delete_id = st.number_input("Enter ID to Delete", min_value=1, step=1)
 
@@ -241,7 +299,9 @@ if not history_df.empty:
         st.rerun()
         
         
-        # Clear All Records
+#--------------------   
+# Clear All Records
+#--------------------
     if st.button("Clear All History"):
         conn = sqlite3.connect("patients.db")
         c = conn.cursor()
@@ -251,11 +311,49 @@ if not history_df.empty:
         st.success("All history cleared.")
         st.rerun()
 
-    # Risk Distribution
+
+
+#-------------------
+# Risk Distribution
+#-------------------
+    
     st.subheader("Risk Distribution")
-    fig, ax = plt.subplots(figsize=(8,5))
-    sns.histplot(history_df["risk"], bins=10, kde=True, ax=ax)
+    history_df["date"] = pd.to_datetime(history_df["date"])
+
+    fig, ax = plt.subplots(figsize=(8,4))
+
+    sns.lineplot(
+        x="date",
+        y="risk",
+        data=history_df,
+        marker="o",
+        ax=ax
+    )
+
+#-------------------------
+# Risk Over Time
+#-------------------------
+
+
+    ax.set_title("Patient Risk Over Time")
+
     st.pyplot(fig)
+        
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Patients", len(history_df))
+
+    col2.metric(
+                "Average Risk",
+                f"{history_df['risk'].mean():.1f}%"
+            )
+
+    col3.metric(
+                "Highest Risk",
+                f"{history_df['risk'].max():.1f}%"
+            )  
+                
+
 else:
     st.write("No history available")
 
@@ -265,14 +363,15 @@ else:
 
 
     # Probability Chart
-    st.subheader("Prediction Probability")
+if "prob" in st.session_state:
 
     prob_df = pd.DataFrame({
-        'Result': ['No Disease', 'Disease'],
-        'Probability': prob
+        "Result": ["No Disease", "Disease"],
+        "Probability": st.session_state["prob"]
     })
 
-    st.bar_chart(prob_df.set_index('Result'))
+    st.subheader("Prediction Probability")
+    st.bar_chart(prob_df.set_index("Result"))
 
     # Patient Overview
     st.subheader("Patient Health Overview")
@@ -294,10 +393,26 @@ try:
 
     feature = st.selectbox("Select Feature", numeric_cols)
 
-    fig, ax = plt.subplots()
-    sns.boxplot(x=df["HeartDisease"], y=df[feature], ax=ax)
-    ax.set_title(f"{feature} vs Heart Disease")
-    st.pyplot(fig)
+    # fig, ax = plt.subplots()
+    # sns.boxplot(x=df["HeartDisease"], y=df[feature], ax=ax)
+    # ax.set_title(f"{feature} vs Heart Disease")
+    
+    # st.pyplot(fig)
+    
+    col1,  = st.columns([1])
+
+    with col1:
+        fig, ax = plt.subplots(figsize=(5, 4))
+    sns.boxplot(
+        x=df["HeartDisease"],
+        y=df[feature],
+        ax=ax
+    )
+    ax.set_title(f"{feature} vs Heart Disease", fontsize=12)
+    st.pyplot(fig, use_container_width=False)
+
+
+
 
     # Pairplot with Color
     st.subheader("Pairplot")
@@ -314,13 +429,27 @@ try:
     )
 
     if len(selected_cols) >= 2:
-        fig = sns.pairplot(
-            df[selected_cols + ["HeartDisease"]],
-            hue="HeartDisease",
-            palette=palette_option,
-            height=5
-        )
-        st.pyplot(fig)
+        # fig = sns.pairplot(
+        #     df[selected_cols + ["HeartDisease"]],
+        #     hue="HeartDisease",
+        #     palette=palette_option,
+        #     height=2.5
+        # )
+        # st.pyplot(fig)
+        col1, col2, col3 = st.columns([1, 3, 1])
+
+    with col2:
+         pair = sns.pairplot(
+        df[selected_cols + ["HeartDisease"]],
+        hue="HeartDisease",
+        palette=palette_option,
+        height=1.9,
+        aspect=0.9
+    )
+
+    pair.fig.set_size_inches(6, 4)
+
+    st.pyplot(pair.fig, use_container_width=False)
 
 except:
     st.info("heart.csv not found")
@@ -348,12 +477,6 @@ except:
 
 
 
-
  
-
-
-
-
-
 
 
