@@ -1,17 +1,18 @@
  
-import io
+import streamlit as st
+import numpy as np
+import pandas as pd
+import random,time
+import seaborn as sns
+import plotly.express as px
+import matplotlib.pyplot as plt
 import joblib
 import sqlite3
-import numpy as np
-import random,time
-import pandas as pd
-import seaborn as sns
-import streamlit as st
 from datetime import datetime
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import plotly.graph_objects as go
+import io
 
  
 
@@ -127,25 +128,87 @@ def create_pdf(age, bp, chol, maxhr, oldpeak, risk, prediction):
     c.save()
     buffer.seek(0)
     return buffer
+# ============================================
+# Sidebar
+# ============================================
+
+with st.sidebar:
+    
+    # -----------------------------
+    # About Project
+    # -----------------------------
+    with st.expander("ℹ️ About Project"):
+
+        st.write("""
+    This application predicts the probability of heart disease using a Machine Learning model.
+
+    **Algorithm**
+    - K-Nearest Neighbors (KNN)
+
+    **Libraries**
+    - Streamlit
+    - Scikit-Learn
+    - Plotly
+    - Pandas
+    - SQLite
+
+    **Prediction**
+    - Low Risk
+    - High Risk
+
+    **Output**
+    - Risk Percentage
+    - PDF Report
+    - Patient History
+    """
+)
+
+    # -----------------------------
+    # Model Information
+    # -----------------------------
+    
+    with st.expander(" Model Information"):
+        st.subheader(" Model Information")
+
+        st.metric("Model", "KNN")
+
+        st.metric("Accuracy", "87%")
+
+        st.metric("F1 Score", "0.86")
+
+        st.metric("Dataset", "918 Records")
+
+        st.metric("Features", "11")
+
+        st.divider()
+
+    # -----------------------------
+    # Quick Statistics
+    # -----------------------------
+    st.subheader(" Quick Stats")
+
+    st.success("✔ Binary Classification")
+
+    st.info("✔ Scaled Features")
+
+    st.info("✔ One-Hot Encoding")
+
+    st.success("✔ Probability Prediction")
+
+    st.divider()
 
 
 
+ 
 # ---------------------------------
-# Sidebar - Model Info
+# Patient Information Form
 # ---------------------------------
+st.markdown("##  Patient Information")
 
-st.sidebar.header("Model Information")
-st.sidebar.write("Model: KNN Classifier")
-st.sidebar.write("Accuracy: 87%")
-st.sidebar.write("F1 Score: 0.86")
-
-# ---------------------------------
-# Input Section
-# ---------------------------------
 col1, col2 = st.columns(2)
 
 with col1:
-    age = st.slider("Age", 1, 120, 40)
+    age = st.slider("Age", 1, 120, 20)
     sex = st.selectbox("Sex", ["M", "F"])
     chest_pain = st.selectbox("Chest Pain Type", ["ATA", "NAP", "ASY", "TA"])
     resting_bp = st.number_input("Resting Blood Pressure", 80, 200, 120)
@@ -212,9 +275,9 @@ if st.button("Predict"):
     
     
     if prediction == 1:
-        st.error(f"⚠️ High Risk of Heart Disease ({risk_percent:.1f}%)")
+        st.error(f" High Risk of Heart Disease ({risk_percent:.1f}%)")
     else:
-        st.success(f"✅ Low Risk of Heart Disease ({risk_percent:.1f}%)")
+        st.success(f" Low Risk of Heart Disease ({risk_percent:.1f}%)")
 
     # Risk Interpretation
     if risk_percent < 30:
@@ -258,11 +321,11 @@ else:
     st.error("Obese")
 
 tips=[
-"🚶 Walk 30 minutes daily",
-"🥗 Eat more vegetables",
-"🚭 Avoid smoking",
-"❤️ Exercise regularly",
-"😴 Sleep 7-8 hours"
+" Walk 30 minutes daily",
+" Eat more vegetables",
+" Avoid smoking",
+" Exercise regularly",
+" Sleep 7-8 hours"
 ]
 
 st.info(random.choice(tips))
@@ -272,7 +335,7 @@ st.info(random.choice(tips))
 # ---------------------------------
 # Patient History
 # ---------------------------------
-st.subheader("📋 Patient History")
+st.subheader(" Patient History")
 
 conn = sqlite3.connect("patients.db")
 history_df = pd.read_sql("SELECT * FROM history ORDER BY id DESC", conn)
@@ -282,9 +345,9 @@ if not history_df.empty:
     st.dataframe(history_df, use_container_width=True)
 
 
-#----------------------
-# Delete Single Record
-#----------------------
+    #----------------------
+    # Delete Single Record
+    #----------------------
 
     st.markdown("### 🗑 Delete Record")
     delete_id = st.number_input("Enter ID to Delete", min_value=1, step=1)
@@ -299,9 +362,9 @@ if not history_df.empty:
         st.rerun()
         
         
-#--------------------   
-# Clear All Records
-#--------------------
+    #--------------------   
+    # Clear All Records
+    #--------------------
     if st.button("Clear All History"):
         conn = sqlite3.connect("patients.db")
         c = conn.cursor()
@@ -312,47 +375,70 @@ if not history_df.empty:
         st.rerun()
 
 
+        
+    #-------------------
+    # Risk Distribution
+    #-------------------
 
-#-------------------
-# Risk Distribution
-#-------------------
-    
-    st.subheader("Risk Distribution")
-    history_df["date"] = pd.to_datetime(history_df["date"])
+    st.subheader(" Risk Distribution")
 
-    fig, ax = plt.subplots(figsize=(8,4))
+    # Convert date column to datetime
+    history_df["date"] = pd.to_datetime(history_df["date"], errors="coerce")
 
-    sns.lineplot(
+    # Remove invalid dates
+    history_df = history_df.dropna(subset=["date"])
+
+    # Sort by date
+    history_df = history_df.sort_values("date")
+
+    # Plotly Line Chart
+    fig = px.line(
+        history_df,
         x="date",
         y="risk",
-        data=history_df,
-        marker="o",
-        ax=ax
+        markers=True,
+        title="Patient Risk Over Time"
     )
 
-#-------------------------
-# Risk Over Time
-#-------------------------
+    fig.update_traces(
+        line=dict(width=3),
+        marker=dict(size=8)
+    )
 
+    fig.update_layout(
+        template="plotly_white",
+        xaxis_title="Prediction Date",
+        yaxis_title="Risk (%)",
+        hovermode="x unified",
+        height=450,
+        title_x=0.5
+    )
 
-    ax.set_title("Patient Risk Over Time")
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.pyplot(fig)
-        
+    #-------------------------
+    # Dashboard Metrics
+    #-------------------------
+
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("Patients", len(history_df))
+    with col1:
+        st.metric(
+            " Patients",
+            len(history_df)
+        )
 
-    col2.metric(
-                "Average Risk",
-                f"{history_df['risk'].mean():.1f}%"
-            )
+    with col2:
+        st.metric(
+            " Average Risk",
+            f"{history_df['risk'].mean():.1f}%"
+        )
 
-    col3.metric(
-                "Highest Risk",
-                f"{history_df['risk'].max():.1f}%"
-            )  
-                
+    with col3:
+        st.metric(
+            " Highest Risk",
+            f"{history_df['risk'].max():.1f}%"
+        )
 
 else:
     st.write("No history available")
@@ -377,6 +463,14 @@ if "prob" in st.session_state:
     st.subheader("Patient Health Overview")
     st.bar_chart(input_df[['Age','RestingBP','Cholesterol','MaxHR','Oldpeak']].T)
 
+
+
+ 
+ 
+
+
+
+
 # ---------------------------------
 # Dataset Visualization Section
 # ---------------------------------
@@ -392,12 +486,7 @@ try:
     st.subheader("Feature vs Heart Disease")
 
     feature = st.selectbox("Select Feature", numeric_cols)
-
-    # fig, ax = plt.subplots()
-    # sns.boxplot(x=df["HeartDisease"], y=df[feature], ax=ax)
-    # ax.set_title(f"{feature} vs Heart Disease")
-    
-    # st.pyplot(fig)
+ 
     
     col1,  = st.columns([1])
 
@@ -412,15 +501,48 @@ try:
     st.pyplot(fig, use_container_width=False)
 
 
+    # ==========================================
+    # Pairplot / Distribution Analysis
+    # ==========================================
+
+    st.subheader(" Pairplot Analysis")
+
+    # -----------------------
+    # Visualization Type
+    # -----------------------
+
+    st.caption(
+    "Select a visualization type and numeric columns to explore feature distributions and relationships."
+    )
+    
+    chart_type = st.radio(
+        "Select Visualization",
+        ["Scatter Matrix", "Histogram", "Box Plot", "Violin Plot"],
+        horizontal=True
+    )
 
 
-    # Pairplot with Color
-    st.subheader("Pairplot")
+    # -----------------------
+    # Color Palette
+    # -----------------------
 
     palette_option = st.selectbox(
-        "Select Color Theme",
-        ["deep", "muted", "bright", "pastel", "dark", "colorblind"]
+        "Color Palette",
+        [
+            "Plotly",
+            "D3",
+            "G10",
+            "T10",
+            "Alphabet",
+            "Dark24",
+            "Set1",
+            "Pastel"
+        ]
     )
+
+    # -----------------------
+    # Numeric Columns
+    # -----------------------
 
     selected_cols = st.multiselect(
         "Select Numeric Columns",
@@ -428,29 +550,158 @@ try:
         default=numeric_cols[:3]
     )
 
-    if len(selected_cols) >= 2:
-        # fig = sns.pairplot(
-        #     df[selected_cols + ["HeartDisease"]],
-        #     hue="HeartDisease",
-        #     palette=palette_option,
-        #     height=2.5
-        # )
-        # st.pyplot(fig)
-        col1, col2, col3 = st.columns([1, 3, 1])
+    # ==========================================
+    # Scatter Matrix
+    # ==========================================
 
-    with col2:
-         pair = sns.pairplot(
-        df[selected_cols + ["HeartDisease"]],
-        hue="HeartDisease",
-        palette=palette_option,
-        height=1.9,
-        aspect=0.9
+    if chart_type == "Scatter Matrix":
+
+        if len(selected_cols) < 2:
+
+            st.info("Please select at least **2 numeric columns**.")
+
+        else:
+
+            fig = px.scatter_matrix(
+                df,
+                dimensions=selected_cols,
+                color="HeartDisease",
+                color_discrete_sequence=getattr(
+                    px.colors.qualitative,
+                    palette_option
+                ),
+                opacity=0.75,
+                width=850,
+                height=600,
+                template="plotly_white"
+            )
+
+            fig.update_traces(
+                diagonal_visible=False,
+                showupperhalf=False,
+                marker=dict(size=6)
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+    # ==========================================
+    # Histogram
+    # ==========================================
+
+    elif chart_type == "Histogram":
+
+        if len(selected_cols) != 1:
+
+            st.info("Please select exactly **1 numeric column**.")
+
+        else:
+
+            fig = px.histogram(
+                df,
+                x=selected_cols[0],
+                color="HeartDisease",
+                marginal="box",
+                opacity=0.75,
+                color_discrete_sequence=getattr(
+                    px.colors.qualitative,
+                    palette_option
+                ),
+                template="plotly_white"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+    # ==========================================
+    # Box Plot
+    # ==========================================
+
+    elif chart_type == "Box Plot":
+
+        if len(selected_cols) == 0:
+
+            st.info("Please select at least **1 numeric column**.")
+
+        else:
+
+            fig = px.box(
+                df,
+                y=selected_cols,
+                color_discrete_sequence=getattr(
+                    px.colors.qualitative,
+                    palette_option
+                ),
+                points="outliers",
+                template="plotly_white"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+    # ==========================================
+    # Violin Plot
+    # ==========================================
+
+    elif chart_type == "Violin Plot":
+
+        if len(selected_cols) != 1:
+
+            st.info("Please select exactly **1 numeric column**.")
+
+        else:
+
+            fig = px.violin(
+                df,
+                y=selected_cols[0],
+                color="HeartDisease",
+                box=True,
+                points="all",
+                color_discrete_sequence=getattr(
+                    px.colors.qualitative,
+                    palette_option
+                ),
+                template="plotly_white"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+
+
+
+
+    corr = df[selected_cols].corr().round(2)
+
+    st.subheader("Correlation Matrix")
+
+    fig_corr = px.imshow(
+        corr,
+        text_auto=True,
+        color_continuous_scale="RdBu_r",
+        zmin=-1,
+        zmax=1
     )
 
-    pair.fig.set_size_inches(6, 4)
+    st.plotly_chart(fig_corr, use_container_width=True)
 
-    st.pyplot(pair.fig, use_container_width=False)
 
+
+    st.markdown("## Describe")
+    st.dataframe(
+    df[selected_cols].describe().T
+    )
+    
+    
+    
 except:
     st.info("heart.csv not found")
 
